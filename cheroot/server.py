@@ -55,15 +55,10 @@ import sys
 import time
 import traceback as traceback_
 import logging
+import queue
+import urllib
 
-try:
-    from urllib.parse import unquote_to_bytes
-except ImportError:
-    from urllib import unquote as unquote_to_bytes
-
-import six
-from six.moves import queue
-from six.moves import urllib
+from urllib.parse import unquote_to_bytes
 
 try:
     import pkg_resources
@@ -87,28 +82,17 @@ if 'win' in sys.platform and hasattr(socket, 'AF_INET6'):
         socket.IPV6_V6ONLY = 27
 
 
-if six.PY3:
-    def ntob(n, encoding='ISO-8859-1'):
-        """Return the given native string as a byte string in the given
-        encoding.
-        """
-        # In Python 3, the native string type is unicode
-        return n.encode(encoding)
 
-    def bton(b, encoding='ISO-8859-1'):
-        return b.decode(encoding)
-else:
-    def ntob(n, encoding='ISO-8859-1'):
-        """Return the given native string as a byte string in the given
-        encoding.
-        """
-        # In Python 2, the native string type is bytes. Assume it's already
-        # in the given encoding, which for ISO-8859-1 is almost always what
-        # was intended.
-        return n
+def ntob(n, encoding='ISO-8859-1'):
+    """Return the given native string as a byte string in the given
+    encoding.
+    """
+    # In Python 3, the native string type is unicode
+    return n.encode(encoding)
 
-    def bton(b, encoding='ISO-8859-1'):
-        return b
+def bton(b, encoding='ISO-8859-1'):
+    return b.decode(encoding)
+
 
 
 LF = b'\n'
@@ -816,7 +800,7 @@ class HTTPRequest(object):
 
         buf.append(CRLF)
         if msg:
-            if isinstance(msg, six.text_type):
+            if isinstance(msg, str):
                 msg = msg.encode('ISO-8859-1')
             buf.append(msg)
 
@@ -1029,7 +1013,6 @@ class HTTPConnection(object):
         self.rfile.close()
 
         if not self.linger:
-            self._close_kernel_socket()
             self.socket.close()
         else:
             # On the other hand, sometimes we want to hang around for a bit
@@ -1039,20 +1022,6 @@ class HTTPConnection(object):
             # Someday, perhaps, we'll do the full lingering_close that
             # Apache does, but not today.
             pass
-
-    def _close_kernel_socket(self):
-        """
-        On old Python versions,
-        Python's socket module does NOT call close on the kernel
-        socket when you call socket.close(). We do so manually here
-        because we want this server to send a FIN TCP segment
-        immediately. Note this must be called *before* calling
-        socket.close(), because the latter drops its reference to
-        the kernel socket.
-        """
-        if six.PY2 and hasattr(self.socket, '_sock'):
-            self.socket._sock.close()
-
 
 try:
     import fcntl
@@ -1273,7 +1242,7 @@ class HTTPServer(object):
         if os.getenv('LISTEN_PID', None):
             # systemd socket activation
             self.socket = socket.fromfd(3, socket.AF_INET, socket.SOCK_STREAM)
-        elif isinstance(self.bind_addr, six.string_types):
+        elif isinstance(self.bind_addr, str):
             # AF_UNIX socket
 
             # So we can reuse the socket...
@@ -1412,7 +1381,7 @@ class HTTPServer(object):
                            'Content-Type: text/plain\r\n\r\n',
                            msg]
 
-                    sock_to_make = s if six.PY3 else s._sock
+                    sock_to_make = s
                     wfile = mf(sock_to_make, 'wb', io.DEFAULT_BUFFER_SIZE)
                     try:
                         wfile.write(''.join(buf).encode('ISO-8859-1'))
@@ -1430,7 +1399,7 @@ class HTTPServer(object):
 
             conn = self.ConnectionClass(self, s, mf)
 
-            if not isinstance(self.bind_addr, six.string_types):
+            if not isinstance(self.bind_addr, str):
                 # optional values
                 # Until we do DNS lookups, omit REMOTE_HOST
                 if addr is None:  # sometimes this can happen
@@ -1499,7 +1468,7 @@ class HTTPServer(object):
 
         sock = getattr(self, 'socket', None)
         if sock:
-            if not isinstance(self.bind_addr, six.string_types):
+            if not isinstance(self.bind_addr, str):
                 # Touch our own socket to make accept() return immediately.
                 try:
                     host, port = sock.getsockname()[:2]
@@ -1561,7 +1530,7 @@ ssl_adapters = {
 def get_ssl_adapter_class(name='builtin'):
     """Return an SSL adapter class for the given name."""
     adapter = ssl_adapters[name.lower()]
-    if isinstance(adapter, six.string_types):
+    if isinstance(adapter, str):
         last_dot = adapter.rfind('.')
         attr_name = adapter[last_dot + 1:]
         mod_path = adapter[:last_dot]

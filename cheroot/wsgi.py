@@ -26,12 +26,21 @@ as you want in one instance by using a PathInfoDispatcher::
 
 import sys
 
-import six
-from six.moves import filter
-
 from . import server
 from .workers import threadpool
 from ._compat import ntob, bton
+
+# this func is stolen from `six` package
+def reraise(tp, value, tb=None):
+    try:
+        if value is None:
+            value = tp()
+        if value.__traceback__ is not tb:
+            raise value.with_traceback(tb)
+        raise value
+    finally:
+        value = None
+        tb = None
 
 
 class Server(server.HTTPServer):
@@ -97,7 +106,7 @@ class Gateway(server.Gateway):
         response = self.req.server.wsgi_app(self.env, self.start_response)
         try:
             for chunk in filter(None, response):
-                if not isinstance(chunk, six.binary_type):
+                if not isinstance(chunk, bytes):
                     raise ValueError('WSGI Applications must yield bytes')
                 self.write(chunk)
         finally:
@@ -120,7 +129,7 @@ class Gateway(server.Gateway):
         # exc_info tuple."
         if self.req.sent_headers:
             try:
-                six.reraise(*exc_info)
+                reraise(*exc_info)
             finally:
                 exc_info = None
 
@@ -148,8 +157,6 @@ class Gateway(server.Gateway):
         must be of type "str" but are restricted to code points in the
         "latin-1" set.
         """
-        if six.PY2:
-            return status
         if not isinstance(status, str):
             raise TypeError('WSGI response status is not of type str.')
         return status.encode('ISO-8859-1')
@@ -222,7 +229,7 @@ class Gateway_10(Gateway):
             'wsgi.version': (1, 0),
         }
 
-        if isinstance(req.server.bind_addr, six.string_types):
+        if isinstance(req.server.bind_addr, str):
             # AF_UNIX. This isn't really allowed by WSGI, which doesn't
             # address unix domain sockets. But it's better than nothing.
             env['SERVER_PORT'] = ''
@@ -262,10 +269,10 @@ class Gateway_u0(Gateway_10):
         req = self.req
         env_10 = super(Gateway_u0, self).get_environ(self)
         env = dict(map(self._decode_key, env_10.items()))
-        env[six.u('wsgi.version')] = ('u', 0)
+        env['wsgi.version'] = ('u', 0)
 
         # Request-URI
-        enc = env.setdefault(six.u('wsgi.url_encoding'), six.u('utf-8'))
+        enc = env.setdefault('wsgi.url_encoding', 'utf-8')
         try:
             env['PATH_INFO'] = req.path.decode(enc)
             env['QUERY_STRING'] = req.qs.decode(enc)
@@ -282,17 +289,13 @@ class Gateway_u0(Gateway_10):
     @staticmethod
     def _decode_key(item):
         k, v = item
-        if six.PY2:
-            k = k.decode('ISO-8859-1')
         return k, v
 
     @staticmethod
     def _decode_value(item):
         k, v = item
         skip_keys = 'REQUEST_URI', 'wsgi.input'
-        if six.PY3 or not isinstance(v, bytes) or k in skip_keys:
-            return k, v
-        return k, v.decode('ISO-8859-1')
+        return k, v
 
 
 wsgi_gateways = {
