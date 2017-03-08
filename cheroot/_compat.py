@@ -143,15 +143,8 @@ import pickle  # noqa
 def random20():
     return binascii.hexlify(os.urandom(20)).decode('ascii')
 
-<<<<<<< HEAD
 
-try:
-    from _thread import get_ident as get_thread_ident
-except ImportError:
-    from thread import get_ident as get_thread_ident  # noqa
-=======
 from _thread import get_ident as get_thread_ident
->>>>>>> remove code related to PY2
 
 Timer = threading.Timer
 Event = threading.Event
@@ -159,54 +152,6 @@ Event = threading.Event
 from subprocess import _args_from_interpreter_flags
 
 from html import escape
-
-<<<<<<< HEAD
-try:
-    # Python 2.7+
-    from subprocess import _args_from_interpreter_flags
-except ImportError:
-    def _args_from_interpreter_flags():
-        """Tries to reconstruct original interpreter args from sys.flags for Python 2.6
-        Backported from Python 3.5. Aims to return a list of
-        command-line arguments reproducing the current
-        settings in sys.flags and sys.warnoptions.
-        """
-        flag_opt_map = {
-            'debug': 'd',
-            # 'inspect': 'i',
-            # 'interactive': 'i',
-            'optimize': 'O',
-            'dont_write_bytecode': 'B',
-            'no_user_site': 's',
-            'no_site': 'S',
-            'ignore_environment': 'E',
-            'verbose': 'v',
-            'bytes_warning': 'b',
-            'quiet': 'q',
-            'hash_randomization': 'R',
-            'py3k_warning': '3',
-        }
-
-        args = []
-        for flag, opt in flag_opt_map.items():
-            v = getattr(sys.flags, flag)
-            if v > 0:
-                if flag == 'hash_randomization':
-                    v = 1  # Handle specification of an exact seed
-                args.append('-' + opt * v)
-        for opt in sys.warnoptions:
-            args.append('-W' + opt)
-
-        return args
-
-# html module come in 3.2 version
-try:
-    from html import escape
-except ImportError:
-    from cgi import escape
-=======
->>>>>>> remove code related to PY2
-
 
 # html module needed the argument quote=False because in cgi the default
 # is False. With quote=True the results differ.
